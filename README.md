@@ -6,7 +6,7 @@ measly tries to estimate whether your model is in a data-limited regime or not (
 
 ## Problem Definition 
 
-measly fits
+measly fits many many models to bootstrapped datasets at different fractions of the orginial datset to create an ensemble model.
 
 ```
 L(n) = L∞ + A · n^(−α)
