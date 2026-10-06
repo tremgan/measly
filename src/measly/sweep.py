@@ -1,80 +1,101 @@
 """Measure performance across a grid of training-set sizes."""
 
+from collections.abc import Mapping, Sequence
+
 import numpy as np
+from numpy.typing import NDArray
 import xarray as xr
 
-from measly.interfaces import Data, ProbabilisticModel, Score
+from measly.interfaces import Score, Model
 
 __all__ = ["downsample", "train_test_split", "sweep", "SweepResults"]
 
 
-def downsample(data: Data,
-                    fraction: float,
-                    rng: np.random.Generator,
-                    with_replacement: bool = True):
+def downsample(
+    X,
+    y,
+    fraction: float,
+    rng: np.random.Generator,
+    indices_only=False,
+    with_replacement: bool = True,
+):
 
-    n_samples = int(round(len(data) * fraction))
-    indices = rng.choice(len(data), size=n_samples, replace=with_replacement)
+    assert len(X) == len(y)
+    assert 0 < fraction <= 1
 
-    return data[indices]
+    n_samples = int(round(len(X) * fraction))
+    indices = rng.choice(len(X), size=n_samples, replace=with_replacement)
+
+    if indices_only:
+        return indices
+
+    return X[indices], y[indices]
 
 
-def train_test_split(data: Data,
-                     test_fraction: float,
-                     rng: np.random.Generator) -> tuple[Data, Data]:
-    order = rng.permutation(len(data))
-    n_test = int(round(len(data) * test_fraction))
+def train_test_split(X, y, test_fraction: float, rng: np.random.Generator) -> tuple:
 
-    return data[order[n_test:]], data[order[:n_test]]
+    order = rng.permutation(len(X))
+    n_test = int(round(len(y) * test_fraction))
+    test, train = order[:n_test], order[n_test:]
+
+    return X[train], X[test], y[train], y[test]
 
 
 type SweepResults = xr.DataArray
 
-def sweep(models: list[ProbabilisticModel],
-        data: Data,
-        fractions: list[float],
-        rng: np.random.Generator,
-        score: Score,
-        n_draws: int=30,
-        test_fraction: float=0.25
-        ) -> SweepResults:
+
+def sweep(
+    models: Mapping[str, Model] | Sequence[Model],
+    X,
+    y,
+    fractions: list[float],
+    rng: np.random.Generator,
+    score: Score,
+    n_draws: int = 1000,
+    test_fraction: float = 0.25,
+) -> SweepResults:
     """Score every model at every fraction of the training pool, `n_draws` times.
 
-    The split is redrawn once per draw and held fixed across the fractions
-    within it. Both halves of that matter. Resplitting per draw averages over
-    test sets, so the test set's own sampling error does not survive as a fixed
-    offset on `L_inf`. Holding it fixed within a draw keeps the points of one
-    curve comparable: resplitting per fraction as well measurably worsens both
-    `L_inf` and `alpha`, because differences along the curve then carry test
-    noise that no longer cancels.
+    Only the training pool is downsampled. The test set is fixed within a draw
+    and redrawn between draws. Models MUST be scored on held-out rows. Scoring
+    on the training rows makes the curve rise with n rather than fall.
 
-    Every model in a draw sees the same subsets and the same test set, which
-    makes the comparison between models paired.
+    `models` MAY be a `{name: model}` mapping, which then keys the `model`
+    axis. Otherwise `repr` does, and an sklearn `Pipeline`'s embeds an address.
     """
 
-    results = xr.DataArray(data=np.full((len(fractions), len(models), n_draws), np.nan),
-                           dims=('fraction', 'model', 'draw'),
-                           coords={'fraction': fractions,
-                                   'model': [model.short_name for model in models],
-                                   'draw': np.arange(n_draws)})
+    named = (dict(models) if isinstance(models, Mapping)
+             else {repr(model): model for model in models})
+
+    results = xr.DataArray(
+        data=np.full((len(fractions), len(named), n_draws), np.nan),
+        dims=("fraction", "model", "draw"),
+        coords={
+            "fraction": fractions,
+            "model": list(named),
+            "draw": np.arange(n_draws),
+        },
+    )
 
     # to be parallelized later
     for draw in range(n_draws):
-        train, test = train_test_split(data, test_fraction, rng)
-        subsets = {fraction: downsample(data=train, fraction=fraction, rng=rng)
-                   for fraction in fractions}
+        train_X, test_X, train_y, test_y = train_test_split(X, y, test_fraction, rng)
 
-        for model in models:
-                for fraction, subset in subsets.items():
+        training_sets_indices = {
+            fraction: downsample(train_X, train_y, fraction=fraction, rng=rng, indices_only=True)
+            for fraction in fractions
+        }
 
-                        trained_model = model.condition(subset.X, subset.y)
+        for name, model in named.items():
+            for fraction, indices in training_sets_indices.items():
+                model.fit(train_X[indices], train_y[indices])
 
-                        this_score = score(trained_model.posterior_samples(test.X),
-                                           test.y)
+                pred_y = model.predict(test_X)
 
-                        results.loc[dict(fraction=fraction,
-                                         model=model.short_name,
-                                         draw=draw)] = this_score
+                this_score = score(pred_y, test_y)
 
+                results.loc[dict(fraction=fraction, model=name, draw=draw)] = (
+                    this_score
+                )
 
     return results

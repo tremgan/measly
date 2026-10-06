@@ -1,19 +1,44 @@
 """Estimate whether a model is data-limited, and whether more capacity would pay off."""
 
-from measly.curve_fit import CurveEnsemble, fit_scaling_law, fit_scaling_laws, scaling_law
-from measly.interfaces import Data, EnsembleModel, ProbabilisticModel, Score
+from measly.analysis import (
+    DEFAULT_FRACTIONS,
+    VALIDATION_WARN,
+    Analysis,
+    Projection,
+    analyse,
+    mean_squared_error,
+)
+from measly.fit import (
+    POW3,
+    POW4,
+    CurveEnsemble,
+    ScalingLaw,
+    fit_scaling_law,
+    fit_scaling_laws,
+    scaling_law,
+)
+from measly.interfaces import Model, Score
+from measly.plot import plot
 from measly.sweep import SweepResults, downsample, sweep, train_test_split
 
 __all__ = [
-    "Data",
-    "ProbabilisticModel",
-    "EnsembleModel",
+    "analyse",
+    "Analysis",
+    "Projection",
+    "mean_squared_error",
+    "plot",
+    "DEFAULT_FRACTIONS",
+    "VALIDATION_WARN",
+    "Model",
     "Score",
     "downsample",
     "train_test_split",
     "sweep",
     "SweepResults",
     "scaling_law",
+    "ScalingLaw",
+    "POW3",
+    "POW4",
     "CurveEnsemble",
     "fit_scaling_law",
     "fit_scaling_laws",

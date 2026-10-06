@@ -5,7 +5,10 @@ __pycache__/
 .venv/
 *.egg-info/
 playground/
+.ruff_cache
 
 demo/
 .pytest_cache/
 dist/
+
+CLAUDE.md
