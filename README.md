@@ -25,7 +25,7 @@ L(n) = L∞ + A · n^(−α)
 ## Quickstart
 
 ```sh
-pip install git+https://github.com/tremgan/measly
+uv add git+https://github.com/tremgan/measly
 ```
 
 Supply a model with `fit`/`predict` and your data. Everything else has a default.
@@ -50,8 +50,8 @@ def ridge(capacity):
 
 rng = np.random.default_rng(0)
 weights = np.concatenate([rng.normal(size=4), np.full(71, 0.05)])
-X = rng.normal(size=(3000, 75))
-y = X @ weights + rng.normal(0, 1.0, 3000)
+X = rng.normal(size=(1000, 75))
+y = X @ weights + rng.normal(0, 1.0, 1000)
 
 # Named, because a Pipeline's repr embeds a memory address.
 result = analyse({"ridge(20 features)": ridge(20),
@@ -61,32 +61,32 @@ plot(result, factor=4.0)
 ```
 
 ```
-measly: 2 model(s), 2250 training examples, 100 draws
+measly: 2 model(s), 750 training examples, 100 draws
         pow4, mean_squared_error (lower is better)
 
   ridge(20 features)
-    now (2250 examples)      1.1649
-    at 4500 examples         1.1564 [1.0968, 1.2498]
-    gain from getting there  +0.0020 [+0.0000, +0.0122]
-    held-back check          0.7% error
+    now (750 examples)       1.0882
+    at 1500 examples         1.0717 [0.9312, 1.2301]
+    gain from getting there  +0.0062 [+0.0001, +0.0367]
+    held-back check          2.1% error
 
   ridge(75 features)
-    now (2250 examples)      1.0333
-    at 4500 examples         1.0289 [0.9604, 1.1169]
-    gain from getting there  +0.0058 [+0.0005, +0.0224]
-    held-back check          1.2% error
+    now (750 examples)       1.0787
+    at 1500 examples         1.0961 [0.9040, 1.3084]
+    gain from getting there  +0.0087 [+0.0009, +0.0391]
+    held-back check          4.9% error
 ```
 
 ![a learning curve for two model capacities](docs/learning-curve.png)
 
-The capacity question in one figure. At 225 examples the 75-feature model is
-18% worse. At 2250 it is 11% better. The curves cross near 400.
+The capacity question in one figure. At 75 examples the 75-feature model is
+more than three times worse. At 750 it is 1% better. The curves cross near 400.
 
-That crossover is what a pilot study hides. Measured only at 225 examples you
+That crossover is what a pilot study hides. Measured only at 75 examples you
 would have picked the small model, and been wrong about every later round. A
 model's rank at one sample size does not give you its rank at the next.
 
-Both gains are small but positive, and the larger model gains about three times
+Both gains are small but positive, and the larger model gains about 40%
 more. That is the answer to "should we collect more": a little, and it is the
 high-capacity model that benefits.
 
@@ -107,17 +107,17 @@ more data means. Only the new rows are redrawn across the ten repeats.
 
 ```
                model  examples            actual  projected           interval   error
-  ridge(20 features)      2812   1.1419 +-0.0019     1.1571   [1.0975, 1.2529]    1.3%
-  ridge(20 features)      3375   1.1397 +-0.0020     1.1570   [1.0971, 1.2510]    1.5%
-  ridge(20 features)      3938   1.1379 +-0.0023     1.1566   [1.0969, 1.2501]    1.6%
-  ridge(20 features)      4500   1.1364 +-0.0020     1.1564   [1.0968, 1.2498]    1.8%
-  ridge(75 features)      2812   1.0256 +-0.0031     1.0316   [0.9775, 1.1188]    0.6%
-  ridge(75 features)      3375   1.0204 +-0.0031     1.0295   [0.9703, 1.1179]    0.9%
-  ridge(75 features)      3938   1.0162 +-0.0033     1.0293   [0.9643, 1.1173]    1.3%
-  ridge(75 features)      4500   1.0133 +-0.0028     1.0289   [0.9604, 1.1169]    1.5%
+  ridge(20 features)       938   1.1592 +-0.0027     1.0795   [0.9534, 1.2388]    6.9%
+  ridge(20 features)      1125   1.1539 +-0.0047     1.0762   [0.9357, 1.2321]    6.7%
+  ridge(20 features)      1312   1.1519 +-0.0047     1.0737   [0.9322, 1.2308]    6.8%
+  ridge(20 features)      1500   1.1499 +-0.0042     1.0717   [0.9312, 1.2301]    6.8%
+  ridge(75 features)       938   1.0736 +-0.0091     1.1035   [0.9201, 1.3113]    2.8%
+  ridge(75 features)      1125   1.0594 +-0.0090     1.1006   [0.9139, 1.3095]    3.9%
+  ridge(75 features)      1312   1.0515 +-0.0091     1.0963   [0.9079, 1.3087]    4.3%
+  ridge(75 features)      1500   1.0466 +-0.0057     1.0961   [0.9040, 1.3084]    4.7%
 ```
 
-All eight land inside their intervals, never more than 1.8% from the median.
+All eight land inside their intervals, never more than 6.9% from the median.
 
 Do not read the projected loss as biased either way. Over eight pilots the
 projection at 2x sat above what actually happened in 3 of 8 for the nearly flat
@@ -131,8 +131,8 @@ is as far as the method carries evidence. Projecting ten times out would
 return a number and support none of it.
 
 Their error bars are smaller than the markers that carry them. Ten independent
-collections at one size vary by 0.0019 to 0.0033, while the band spans about
-0.15. The band is conservative by roughly two orders of magnitude, which is the
+collections at one size vary by 0.0027 to 0.0091, while the band spans about
+0.3. The band is conservative by roughly two orders of magnitude, which is the
 safe direction to be wrong in but worth knowing. Most of that width is test-set
 noise, not uncertainty about the curve.
 
