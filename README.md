@@ -148,7 +148,7 @@ does not predict it.
 `analyse(...).results` is an `xarray.DataArray` over `(fraction, model, draw)`
 if you want the raw measurements.
 
-## References
+## Previous work in this area/Inspiration
 
 - [The Shape of Learning Curves: a Review](https://arxiv.org/abs/2103.10948). Viering & Loog, 2021.
 - [Deep Learning Scaling is Predictable, Empirically](https://arxiv.org/abs/1712.00409). Hestness et al., 2017.
