@@ -3,32 +3,11 @@
 from collections.abc import Mapping, Sequence
 
 import numpy as np
-from numpy.typing import NDArray
 import xarray as xr
 
 from measly.interfaces import Score, Model
 
-__all__ = ["downsample", "train_test_split", "sweep", "SweepResults"]
-
-
-def downsample(
-    X,
-    y,
-    fraction: float,
-    rng: np.random.Generator,
-    indices_only=False,
-):
-
-    assert len(X) == len(y)
-    assert 0 < fraction <= 1
-
-    n_samples = int(round(len(X) * fraction))
-    indices = rng.choice(len(X), size=n_samples, replace=False)
-
-    if indices_only:
-        return indices
-
-    return X[indices], y[indices]
+__all__ = ["train_test_split", "sweep"]
 
 
 def train_test_split(X, y, test_fraction: float, rng: np.random.Generator) -> tuple:
@@ -40,9 +19,6 @@ def train_test_split(X, y, test_fraction: float, rng: np.random.Generator) -> tu
     return X[train], X[test], y[train], y[test]
 
 
-type SweepResults = xr.DataArray
-
-
 def sweep(
     models: Mapping[str, Model] | Sequence[Model],
     X,
@@ -52,7 +28,7 @@ def sweep(
     score: Score,
     n_draws: int = 1000,
     test_fraction: float = 0.25,
-) -> SweepResults:
+) -> xr.DataArray:
     """Score every model at every fraction of the training pool, `n_draws` times.
 
     Only the training pool is downsampled. The test set is fixed within a draw
@@ -65,40 +41,35 @@ def sweep(
 
     `models` MAY be a `{name: model}` mapping, which then keys the `model`
     axis. Otherwise `repr` does, and an sklearn `Pipeline`'s embeds an address.
+    Those keys MUST be distinct, or one model would overwrite another.
     """
 
     named = (dict(models) if isinstance(models, Mapping)
              else {repr(model): model for model in models})
+    if len(named) != len(models):
+        raise ValueError(
+            "models must have distinct repr(). The results array keys its model "
+            "axis by repr, so duplicates would overwrite each other. Pass a "
+            "{name: model} mapping to name them."
+        )
 
-    results = xr.DataArray(
-        data=np.full((len(fractions), len(named), n_draws), np.nan),
-        dims=("fraction", "model", "draw"),
-        coords={
-            "fraction": fractions,
-            "model": list(named),
-            "draw": np.arange(n_draws),
-        },
-    )
+    scores = np.full((len(fractions), len(named), n_draws), np.nan)
 
-    # to be parallelized later
     for draw in range(n_draws):
         train_X, test_X, train_y, test_y = train_test_split(X, y, test_fraction, rng)
 
-        training_sets_indices = {
-            fraction: downsample(train_X, train_y, fraction=fraction, rng=rng, indices_only=True)
+        training_sets_indices = [
+            rng.choice(len(train_X), size=round(len(train_X) * fraction), replace=False)
             for fraction in fractions
-        }
+        ]
 
-        for name, model in named.items():
-            for fraction, indices in training_sets_indices.items():
+        for m, model in enumerate(named.values()):
+            for f, indices in enumerate(training_sets_indices):
                 model.fit(train_X[indices], train_y[indices])
+                scores[f, m, draw] = score(model.predict(test_X), test_y)
 
-                pred_y = model.predict(test_X)
-
-                this_score = score(pred_y, test_y)
-
-                results.loc[dict(fraction=fraction, model=name, draw=draw)] = (
-                    this_score
-                )
-
-    return results
+    return xr.DataArray(
+        scores,
+        dims=("fraction", "model", "draw"),
+        coords={"fraction": fractions, "model": list(named), "draw": np.arange(n_draws)},
+    )

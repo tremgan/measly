@@ -51,14 +51,11 @@ def plot(analysis: Analysis, factor: float = 2.0, interval: float = 0.9, ax=None
                     color=colour, elinewidth=1.1, capsize=0, zorder=5)
 
     ax.axvline(analysis.n_train, color=GUIDE, ls=(0, (2, 3)), lw=1, zorder=1)
-    ax.annotate("measured", xy=(analysis.n_train, 0.0),
-                xycoords=("data", "axes fraction"), xytext=(-5, 7),
-                textcoords="offset points", ha="right", va="bottom",
-                color=GUIDE, fontsize=8)
-    ax.annotate("projected", xy=(analysis.n_train, 0.0),
-                xycoords=("data", "axes fraction"), xytext=(5, 7),
-                textcoords="offset points", ha="left", va="bottom",
-                color=GUIDE, fontsize=8)
+    for text, offset, side in (("measured", -5, "right"), ("projected", 5, "left")):
+        ax.annotate(text, xy=(analysis.n_train, 0.0),
+                    xycoords=("data", "axes fraction"), xytext=(offset, 7),
+                    textcoords="offset points", ha=side, va="bottom",
+                    color=GUIDE, fontsize=8)
 
     ax.set_xscale("log")
     ax.set_xlim(min(grid) * analysis.n_train / 1.05, max(grid) * analysis.n_train * 1.05)

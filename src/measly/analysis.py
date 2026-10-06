@@ -1,15 +1,13 @@
-
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Sequence
-from rich import print
 
 import numpy as np
+import xarray as xr
 from numpy.typing import NDArray
 
 from measly.fit import POW4, CurveEnsemble, ScalingLaw, fit_scaling_law, fit_scaling_laws
 from measly.interfaces import Model, Score
-from measly.sweep import SweepResults, sweep
+from measly.sweep import sweep
 
 __all__ = [
     "mean_squared_error",
@@ -64,7 +62,7 @@ class Projection:
 class Analysis:
     """The measured curve, the fitted curves, and whether to believe them."""
 
-    results: SweepResults
+    results: xr.DataArray
     curves: dict[str, CurveEnsemble]
     validation: dict[str, float]
     law: ScalingLaw
@@ -173,7 +171,7 @@ class Analysis:
                 f"{self.law!r}, {checked}>")
 
 
-def _validate(results: SweepResults, fractions: Sequence[float], hold_back: int,
+def _validate(results: xr.DataArray, fractions: Sequence[float], hold_back: int,
               law: ScalingLaw, floor: float) -> dict[str, float]:
     """Refit on the smaller sizes, then predict the largest measured ones.
 
@@ -233,16 +231,6 @@ def analyse(
     `models` MAY be a `{name: model}` mapping. Name them whenever `repr` is
     unhelpful, as it is for an sklearn `Pipeline`.
     """
-    if not isinstance(models, Mapping):
-        labels = [repr(model) for model in models]
-        duplicates = {label for label in labels if labels.count(label) > 1}
-        if duplicates:
-            raise ValueError(
-                f"models must have distinct repr(); duplicated: {sorted(duplicates)}. "
-                "The results array keys its model axis by repr, so duplicates would "
-                "overwrite each other. Pass a {name: model} mapping to name them."
-            )
-
     generator = np.random.default_rng(rng)
     fractions = list(fractions)
 
@@ -268,8 +256,6 @@ def analyse(
 if __name__ == "__main__":
     # uv run python src/measly/analysis.py
     # The `-m` form warns: __init__ imports this module, so runpy loads it twice.
-    from measly.fit import POW3
-
     class _Ridge:
         """A model in the fit/predict convention. Penalty sets its capacity."""
 

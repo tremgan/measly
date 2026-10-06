@@ -12,10 +12,9 @@ import xarray as xr
 from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import curve_fit
 
-from measly.sweep import SweepResults
 
 __all__ = [
-    "scaling_law",
+    "pow3",
     "ScalingLaw",
     "POW3",
     "POW4",
@@ -24,11 +23,11 @@ __all__ = [
     "fit_scaling_laws",
 ]
 
+# Below 0, loss would rise with data. Above 5 is not physical.
 _ALPHA_BOUNDS = (0.01, 5.0)
-"""Below 0, loss would rise with data. Above 5 is not physical."""
 
 
-def scaling_law(n, lower_bound, A, alpha):
+def pow3(n, lower_bound, A, alpha):
     """L(n) = L_inf + A * n^(-alpha). Called `pow3` in the literature.
 
     `n` MAY be counts or fractions of the pool. `lower_bound` and `alpha` are
@@ -76,13 +75,11 @@ def _pow3_guess(y: NDArray, floor: float) -> tuple[list[float], tuple]:
 
 
 def _pow4_guess(y: NDArray, floor: float) -> tuple[list[float], tuple]:
-    start = max(float(y.min()) * 0.9, floor)
-    p0 = [start, max(float(y.max() - y.min()), 1e-6), 1.0, 0.01]
-    return p0, ((floor, 0.0, _ALPHA_BOUNDS[0], 0.0),
-                (np.inf, np.inf, _ALPHA_BOUNDS[1], 10.0))
+    p0, (lower, upper) = _pow3_guess(y, floor)
+    return p0 + [0.01], (lower + (0.0,), upper + (10.0,))
 
 
-POW3 = ScalingLaw("pow3", scaling_law, _pow3_guess)
+POW3 = ScalingLaw("pow3", pow3, _pow3_guess)
 POW4 = ScalingLaw("pow4", _pow4, _pow4_guess)
 
 
@@ -92,7 +89,7 @@ class CurveEnsemble:
 
     curves: list[Callable] = field(default_factory=list)
     n_failed: int = 0  # draws whose fit did not converge
-  
+
     def __len__(self) -> int:
         return len(self.curves)
 
@@ -120,11 +117,9 @@ def fit_scaling_law(
     """
     ensemble = CurveEnsemble()
 
-    for _, draw_data in model_results.groupby("draw"):
-        # groupby keeps a length-1 draw axis. curve_fit rejects 2-D ydata.
-        y = np.asarray(draw_data.squeeze("draw").values, dtype=float)
-        x = np.asarray(draw_data.fraction.values, dtype=float)
+    x = np.asarray(model_results.fraction.values, dtype=float)
 
+    for y in model_results.transpose("draw", "fraction").values:
         p0, bounds = law.guess(y, floor)
 
         try:
@@ -141,10 +136,10 @@ def fit_scaling_law(
 
 
 def fit_scaling_laws(
-    results: SweepResults, law: ScalingLaw = POW4, floor: float = 0.0
+    results: xr.DataArray, law: ScalingLaw = POW4, floor: float = 0.0
 ) -> dict[str, CurveEnsemble]:
     """Fit every model in a sweep, keyed by its label on the `model` axis."""
     return {
-        str(name): fit_scaling_law(group.squeeze("model"), law=law, floor=floor)
-        for name, group in results.groupby("model")
+        str(name): fit_scaling_law(results.sel(model=name), law=law, floor=floor)
+        for name in results.model.values
     }

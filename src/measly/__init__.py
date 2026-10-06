@@ -15,11 +15,11 @@ from measly.fit import (
     ScalingLaw,
     fit_scaling_law,
     fit_scaling_laws,
-    scaling_law,
+    pow3,
 )
 from measly.interfaces import Model, Score
 from measly.plot import plot
-from measly.sweep import SweepResults, downsample, sweep, train_test_split
+from measly.sweep import sweep, train_test_split
 
 __all__ = [
     "analyse",
@@ -31,11 +31,9 @@ __all__ = [
     "VALIDATION_WARN",
     "Model",
     "Score",
-    "downsample",
     "train_test_split",
     "sweep",
-    "SweepResults",
-    "scaling_law",
+    "pow3",
     "ScalingLaw",
     "POW3",
     "POW4",

@@ -18,8 +18,6 @@ classifiers = [
 dependencies = [
     "matplotlib>=3.8",
     "numpy>=1.26",
-    "rich>=15.0.0",
-    "ruff>=0.16.10",
     "scipy>=1.17.1",
     "xarray>=2026.9.0",
 ]
@@ -31,7 +29,7 @@ Issues = "https://github.com/tremgan/measly/issues"
 
 [dependency-groups]
 dev = ["pytest>=8"]
-demo = ["matplotlib>=3.8", "scikit-learn>=1.4"]
+demo = ["scikit-learn>=1.4"]
 
 [tool.pytest.ini_options]
 pythonpath = ["tests"]

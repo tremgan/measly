@@ -1,12 +1,16 @@
 import numpy as np
 import pytest
+import xarray as xr
 
 from measly import (
+    DEFAULT_FRACTIONS,
+    POW3,
+    POW4,
+    ScalingLaw,
     analyse,
-    downsample,
     fit_scaling_law,
     fit_scaling_laws,
-    scaling_law,
+    pow3,
     sweep,
     train_test_split,
 )
@@ -46,13 +50,6 @@ def run(data, n_draws=6, seed=0):
     X, y = data
     return sweep(models=[Ridge(1.0), Ridge(300.0)], X=X, y=y, fractions=FRACTIONS,
                  rng=np.random.default_rng(seed), score=mse, n_draws=n_draws)
-
-
-def test_downsample_size_and_no_repeats(data):
-    X, y = data
-    Xs, ys = downsample(X, y, 0.5, np.random.default_rng(0))
-    assert len(Xs) == len(ys) == round(0.5 * len(X))
-    assert len(np.unique(Xs, axis=0)) == len(Xs)
 
 
 def test_full_fraction_still_varies_across_draws(data):
@@ -100,15 +97,14 @@ def test_spread_shrinks_with_sample_size(data):
 def test_fit_recovers_a_known_curve():
     truth = dict(lower_bound=1.0, A=0.6, alpha=1.0)
     rng = np.random.default_rng(0)
-    clean = scaling_law(np.array(FRACTIONS), **truth)
+    clean = pow3(np.array(FRACTIONS), **truth)
     noisy = clean[:, None] + rng.normal(0, 0.01, (len(FRACTIONS), 20))
-    import xarray as xr
     measured = xr.DataArray(noisy, dims=("fraction", "draw"),
                             coords={"fraction": FRACTIONS, "draw": np.arange(20)})
 
     ensemble = fit_scaling_law(measured)
     assert len(ensemble) == 20 and ensemble.n_failed == 0
-    assert np.median(ensemble.predict(1.0)) == pytest.approx(scaling_law(1.0, **truth), abs=0.02)
+    assert np.median(ensemble.predict(1.0)) == pytest.approx(pow3(1.0, **truth), abs=0.02)
 
 
 def test_predict_shape(data):
@@ -124,17 +120,13 @@ def test_fit_scaling_laws_keys_by_model(data):
     assert set(fitted) == {"Ridge(1)", "Ridge(300)"}
 
 
-def test_law_is_configurable_and_defaults_to_pow3():
-    from measly import POW3, POW4, ScalingLaw
-
+def test_law_names_and_zero_shift_is_pow3():
     assert repr(POW3) == "pow3" and repr(POW4) == "pow4"
     assert POW3(1.0, 1.0, 0.5, 1.0) == pytest.approx(1.5)
     assert POW4(1.0, 1.0, 0.5, 1.0, 0.0) == pytest.approx(1.5)  # shift=0 is pow3
 
 
 def test_pow4_fits_and_differs_from_pow3(data):
-    from measly import POW3, POW4
-
     measured = run(data, n_draws=10).sel(model="Ridge(300)")
     three = fit_scaling_law(measured, law=POW3)
     four = fit_scaling_law(measured, law=POW4)
@@ -150,8 +142,6 @@ def test_each_curve_keeps_its_own_parameters(data):
 
 
 def test_a_custom_law_can_be_supplied(data):
-    from measly import ScalingLaw
-
     flat = ScalingLaw("flat", lambda x, c: c + 0.0 * np.asarray(x, float),
                       lambda y, floor: ([max(float(y.min()), floor)],
                                         ((floor,), (np.inf,))))
@@ -161,8 +151,6 @@ def test_a_custom_law_can_be_supplied(data):
 
 
 def test_default_law_is_pow4(data):
-    from measly import POW4
-
     measured = run(data, n_draws=5).sel(model="Ridge(300)")
     assert np.allclose(fit_scaling_law(measured).predict(2.0),
                        fit_scaling_law(measured, law=POW4).predict(2.0))
@@ -185,14 +173,12 @@ def test_analyse_keys_everything_by_model_repr(data):
 
 
 def test_default_grid_is_eight_fractions(data):
-    from measly import DEFAULT_FRACTIONS
-
     assert len(DEFAULT_FRACTIONS) == 8
     assert analysed(data).results.sizes["fraction"] == 8
 
 
 def test_projection_brackets_its_median(data):
-    for name, projection in analysed(data).project(2.0).items():
+    for projection in analysed(data).project(2.0).values():
         assert projection.low <= projection.loss <= projection.high
         assert projection.gain_low <= projection.gain <= projection.gain_high
 
@@ -231,8 +217,6 @@ def test_duplicate_model_labels_are_rejected(data):
 
 
 def test_law_flows_through(data):
-    from measly import POW3
-
     assert analysed(data, law=POW3).law is POW3
 
 
@@ -276,7 +260,7 @@ def test_gain_interval_is_tighter_than_the_loss_interval(data):
 
 def test_project_returns_floats_for_one_factor(data):
     projected = analysed(data).project(2.0)
-    assert all(isinstance(getattr(p, "loss"), float) for p in projected.values())
+    assert all(isinstance(p.loss, float) for p in projected.values())
 
 
 def test_plot_labels_each_model(data):
