@@ -27,7 +27,7 @@ $$L(n) = L_\infty + A\,n^{-\alpha}$$
 
 <img width="991" height="662" alt="image" src="https://github.com/user-attachments/assets/2e0892b5-ade2-450f-a241-8a807b61e2e2" />
 
-Here's a complete work-in-progress graph to get a feel for what it's actually doing
+Here's a totally work-in-progress graph to get a feel for what it's actually doing
 
 ## Previous work in this area/Inspiration
 
