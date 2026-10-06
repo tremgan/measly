@@ -9,6 +9,7 @@ jobs:
   pypi:
     runs-on: ubuntu-latest
     permissions:
+      contents: read    # a permissions block zeroes every scope not listed
       id-token: write   # mints the OIDC token PyPI trades for upload rights
     steps:
       - uses: actions/checkout@v4
