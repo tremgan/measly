@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from conftest import FRACTIONS, Ridge, run
-from measly import analyse, train_test_split
+from conftest import FRACTIONS, Ridge, mse, run
+from measly import analyse, sweep, train_test_split
 
 
 def test_full_fraction_still_varies_across_draws(data):
@@ -30,6 +30,15 @@ def test_sweep_shape_and_labels(data):
 def test_every_cell_is_written(data):
     """The array is NaN-initialised, so a skipped cell stays NaN."""
     assert not np.isnan(run(data).values).any()
+
+
+def test_parallel_sweep_matches_serial(data):
+    X, y = data
+    kwargs = dict(models=[Ridge(1.0), Ridge(300.0)], X=X, y=y, fractions=FRACTIONS,
+                  score=mse, n_draws=6)
+    serial = sweep(rng=np.random.default_rng(0), **kwargs)
+    parallel = sweep(rng=np.random.default_rng(0), n_jobs=2, **kwargs)
+    assert np.array_equal(serial, parallel)
 
 
 def test_sweep_is_reproducible(data):
