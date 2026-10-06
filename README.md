@@ -1,5 +1,7 @@
 # measly🍽️
 
+[![PyPI](https://img.shields.io/pypi/v/measly)](https://pypi.org/project/measly/)
+
 More data helps. measly estimates how much.
 
 measly estimates whether a model is data-limited, meaning whether measuring more samples would improve its performance. It is built for fields where each measurement is slow and expensive, such as the life sciences.
