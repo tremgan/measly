@@ -1,6 +1,8 @@
 """Measure performance across a grid of training-set sizes."""
 
+import os
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import xarray as xr
@@ -19,6 +21,17 @@ def train_test_split(X, y, test_fraction: float, rng: np.random.Generator) -> tu
     return X[train], X[test], y[train], y[test]
 
 
+def _score_draw(task) -> np.ndarray:
+    """One draw's scores, `(fraction, model)`. Top level so a pool can pickle it."""
+    models, score, train_X, train_y, test_X, test_y, subsets = task
+    scores = np.empty((len(subsets), len(models)))
+    for m, model in enumerate(models):
+        for f, indices in enumerate(subsets):
+            model.fit(train_X[indices], train_y[indices])
+            scores[f, m] = score(model.predict(test_X), test_y)
+    return scores
+
+
 def sweep(
     models: Mapping[str, Model] | Sequence[Model],
     X,
@@ -28,6 +41,7 @@ def sweep(
     score: Score,
     n_draws: int = 1000,
     test_fraction: float = 0.25,
+    n_jobs: int = 1,
 ) -> xr.DataArray:
     """Score every model at every fraction of the training pool, `n_draws` times.
 
@@ -42,6 +56,10 @@ def sweep(
     `models` MAY be a `{name: model}` mapping, which then keys the `model`
     axis. Otherwise `repr` does, and an sklearn `Pipeline`'s embeds an address.
     Those keys MUST be distinct, or one model would overwrite another.
+
+    `n_jobs` > 1 scores draws in that many processes, -1 in all cores. Results
+    do not change. `score` and the models MUST be picklable, so no lambdas.
+    Set `OMP_NUM_THREADS=1` or the workers' BLAS threads will contend.
     """
 
     named = (dict(models) if isinstance(models, Mapping)
@@ -53,20 +71,24 @@ def sweep(
             "{name: model} mapping to name them."
         )
 
-    scores = np.full((len(fractions), len(named), n_draws), np.nan)
+    def tasks():
+        for _ in range(n_draws):
+            train_X, test_X, train_y, test_y = train_test_split(X, y, test_fraction, rng)
+            subsets = [
+                rng.choice(len(train_X), size=round(len(train_X) * fraction), replace=False)
+                for fraction in fractions
+            ]
+            yield list(named.values()), score, train_X, train_y, test_X, test_y, subsets
 
-    for draw in range(n_draws):
-        train_X, test_X, train_y, test_y = train_test_split(X, y, test_fraction, rng)
-
-        training_sets_indices = [
-            rng.choice(len(train_X), size=round(len(train_X) * fraction), replace=False)
-            for fraction in fractions
-        ]
-
-        for m, model in enumerate(named.values()):
-            for f, indices in enumerate(training_sets_indices):
-                model.fit(train_X[indices], train_y[indices])
-                scores[f, m, draw] = score(model.predict(test_X), test_y)
+    if n_jobs == 1:
+        per_draw = map(_score_draw, tasks())
+    else:
+        # ponytail: holds all draws' data at once. Ship indices if the pool is large.
+        workers = (os.cpu_count() or 1) if n_jobs == -1 else n_jobs
+        with ProcessPoolExecutor(workers) as pool:
+            per_draw = list(pool.map(_score_draw, tasks(),
+                                     chunksize=max(1, n_draws // (4 * workers))))
+    scores = np.stack(list(per_draw), axis=-1)
 
     return xr.DataArray(
         scores,
