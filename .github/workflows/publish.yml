@@ -1,0 +1,21 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # mints the OIDC token PyPI trades for upload rights
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # The release tag and pyproject.toml are two sources of truth for the
+      # version. PyPI rejects a duplicate upload, so catch a mismatch here.
+      - if: github.event_name == 'release'   # on dispatch the ref is a branch
+        run: grep -q "^version = \"${GITHUB_REF_NAME#v}\"$" pyproject.toml
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1
