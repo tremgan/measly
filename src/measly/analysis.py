@@ -218,6 +218,7 @@ def analyse(
     floor: float = 0.0,
     rng: int | np.random.Generator | None = None,
     hold_back: int = 2,
+    n_jobs: int = 1,
 ) -> Analysis:
     """Measure a learning curve for each model and project it forward.
 
@@ -230,6 +231,8 @@ def analyse(
 
     `models` MAY be a `{name: model}` mapping. Name them whenever `repr` is
     unhelpful, as it is for an sklearn `Pipeline`.
+
+    `n_jobs` parallelises the sweep without changing results. See `sweep`.
     """
     generator = np.random.default_rng(rng)
     fractions = list(fractions)
@@ -243,6 +246,7 @@ def analyse(
         score=score,
         n_draws=n_draws,
         test_fraction=test_fraction,
+        n_jobs=n_jobs,
     )
 
     curves = fit_scaling_laws(results, law=law, floor=floor)
