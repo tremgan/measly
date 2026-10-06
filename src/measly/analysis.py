@@ -90,15 +90,17 @@ class Analysis:
         `factor` MAY be a sequence. One call then gives the whole
         extrapolation curve, which is what a plot needs.
 
-        The interval is a percentile range across the fitted curves. It widens
-        as `factor` moves away from what was measured. It is conservative:
-        against simulated ground truth it covered 98% or more at a nominal
-        90%, and 71% or more at a nominal 50%, so the level is a floor rather
-        than a calibrated rate.
+        The interval on `loss` is a percentile range across the fitted curves.
+        It is dominated by test-set noise: every point in a draw shares one
+        test set, so that draw's curve is shifted bodily. It is conservative,
+        covering 98% or more at a nominal 90% against simulated ground truth.
+
+        The interval on `gain` is far tighter, because each member is paired
+        with itself and the shared offset cancels. `gain` is therefore not
+        `measured()` minus `loss`; it is what the curve itself says it climbs.
         """
         tail = (1.0 - interval) / 2.0
         quantiles = [tail, 1.0 - tail]
-        now = self.measured()
 
         scalar = np.ndim(factor) == 0
         factors = np.atleast_1d(np.asarray(factor, dtype=float))
@@ -108,7 +110,10 @@ class Analysis:
             # (len(factors), n_members). Quantiles MUST reduce the member axis
             # only; flattening both would mix factors into one distribution.
             future = ensemble.predict(factors)
-            gains = now[name] - future
+            # Pair each member against its own value at the measured size.
+            # Both carry that draw's test-set offset, so it cancels; comparing
+            # against a mean over draws leaves it in and swamps the gain.
+            gains = ensemble.predict(np.ones(1)) - future
             lo, hi = np.quantile(future, quantiles, axis=-1)
             gain_lo, gain_hi = np.quantile(gains, quantiles, axis=-1)
             projections[name] = Projection(
@@ -209,7 +214,7 @@ def analyse(
     score: Score = mean_squared_error,
     *,
     fractions: Sequence[float] = DEFAULT_FRACTIONS,
-    n_draws: int = 30,
+    n_draws: int = 100,
     test_fraction: float = 0.25,
     law: ScalingLaw = POW4,
     floor: float = 0.0,
@@ -219,7 +224,7 @@ def analyse(
     """Measure a learning curve for each model and project it forward.
 
     `rng` accepts a seed, a `Generator`, or nothing. Pass a seed for a
-    reproducible run. The split and the bootstrap draws both depend on it.
+    reproducible run. The split and the subsets both depend on it.
 
     `hold_back` sets how many of the largest measured sizes are withheld from a
     second fit, used to check the projection. Set it to 0 to skip the check.

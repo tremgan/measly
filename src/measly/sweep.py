@@ -17,14 +17,13 @@ def downsample(
     fraction: float,
     rng: np.random.Generator,
     indices_only=False,
-    with_replacement: bool = True,
 ):
 
     assert len(X) == len(y)
     assert 0 < fraction <= 1
 
     n_samples = int(round(len(X) * fraction))
-    indices = rng.choice(len(X), size=n_samples, replace=with_replacement)
+    indices = rng.choice(len(X), size=n_samples, replace=False)
 
     if indices_only:
         return indices
@@ -59,6 +58,10 @@ def sweep(
     Only the training pool is downsampled. The test set is fixed within a draw
     and redrawn between draws. Models MUST be scored on held-out rows. Scoring
     on the training rows makes the curve rise with n rather than fall.
+
+    Subsets are drawn without replacement. Fraction 1.0 still varies across
+    draws, because each draw resplits the pool. A bootstrap is not needed for
+    that spread and biases the level up by repeating rows.
 
     `models` MAY be a `{name: model}` mapping, which then keys the `model`
     axis. Otherwise `repr` does, and an sklearn `Pipeline`'s embeds an address.

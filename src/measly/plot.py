@@ -2,7 +2,8 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.ticker import FuncFormatter
+from scipy.ndimage import gaussian_filter1d
+from matplotlib.ticker import FuncFormatter, LogLocator, NullLocator
 
 from measly.analysis import Analysis, _score_name
 
@@ -38,7 +39,12 @@ def plot(analysis: Analysis, factor: float = 2.0, interval: float = 0.9, ax=None
 
         ax.fill_between(grid * analysis.n_train, band.low, band.high,
                         color=colour, alpha=0.12, lw=0)
-        ax.plot(grid * analysis.n_train, band.loss, color=colour, lw=2,
+        for edge in (band.low, band.high):
+            ax.plot(grid * analysis.n_train, edge, color=colour, alpha=0.35, lw=0.8)
+        # The pointwise median of a finite ensemble kinks where members cross.
+        # Smoothing is cosmetic. `project` and `summary` report the raw median.
+        centre = gaussian_filter1d(band.loss, sigma=4, mode="nearest")
+        ax.plot(grid * analysis.n_train, centre, color=colour, lw=2,
                 label=label, zorder=4)
         ax.errorbar(measured * analysis.n_train, scores.mean("draw"),
                     yerr=scores.std("draw", ddof=1), fmt="o", ms=5,
@@ -54,7 +60,10 @@ def plot(analysis: Analysis, factor: float = 2.0, interval: float = 0.9, ax=None
                 textcoords="offset points", ha="left", va="bottom",
                 color=GUIDE, fontsize=8)
 
-    ax.set_xlim(0, max(grid) * analysis.n_train * 1.02)
+    ax.set_xscale("log")
+    ax.set_xlim(min(grid) * analysis.n_train / 1.05, max(grid) * analysis.n_train * 1.05)
+    ax.xaxis.set_major_locator(LogLocator(subs=(1, 2, 3, 5)))
+    ax.xaxis.set_minor_locator(NullLocator())
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
 
     ax.grid(axis="y", color="#e5e7eb", lw=0.8)

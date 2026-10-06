@@ -48,17 +48,17 @@ def run(data, n_draws=6, seed=0):
                  rng=np.random.default_rng(seed), score=mse, n_draws=n_draws)
 
 
-def test_downsample_size_and_replacement(data):
+def test_downsample_size_and_no_repeats(data):
     X, y = data
-    Xs, ys = downsample(X, y, 0.25, np.random.default_rng(0))
-    assert len(Xs) == len(ys) == round(0.25 * len(X))
-    assert len(np.unique(Xs, axis=0)) < len(Xs)          # bootstrap repeats rows
-
-
-def test_downsample_without_replacement(data):
-    X, y = data
-    Xs, _ = downsample(X, y, 0.5, np.random.default_rng(0), with_replacement=False)
+    Xs, ys = downsample(X, y, 0.5, np.random.default_rng(0))
+    assert len(Xs) == len(ys) == round(0.5 * len(X))
     assert len(np.unique(Xs, axis=0)) == len(Xs)
+
+
+def test_full_fraction_still_varies_across_draws(data):
+    # The resplit alone must supply spread at 1.0. Without it the band collapses.
+    results = run(data)
+    assert (results.sel(fraction=1.0).std("draw") > 0).all()
 
 
 def test_split_order_sizes_and_alignment(data):
@@ -197,11 +197,15 @@ def test_projection_brackets_its_median(data):
         assert projection.gain_low <= projection.gain <= projection.gain_high
 
 
-def test_gain_is_measured_minus_projected(data):
-    result = analysed(data)
-    now = result.measured()
-    for name, projection in result.project(2.0).items():
-        assert projection.gain == pytest.approx(now[name] - projection.loss, abs=0.05)
+def test_gain_is_what_the_curve_itself_climbs(data):
+    """Each member is paired with its own level, and POW4 cannot rise.
+
+    Comparing a member against a mean over draws instead left that draw's
+    test-set offset in the difference, which produced negative gains.
+    """
+    for projection in analysed(data).project(2.0).values():
+        assert projection.gain >= 0.0
+        assert projection.gain_low >= 0.0
 
 
 def test_same_seed_same_answer(data):
@@ -262,6 +266,12 @@ def test_project_accepts_a_vector_of_factors(data):
                 getattr(curve[name], field),
                 [getattr(p, field) for p in one_at_a_time],
             )
+
+
+def test_gain_interval_is_tighter_than_the_loss_interval(data):
+    """Pairing cancels the per-draw test-set offset that dominates the level."""
+    for projected in analysed(data).project(2.0).values():
+        assert projected.gain_high - projected.gain_low < projected.high - projected.low
 
 
 def test_project_returns_floats_for_one_factor(data):
