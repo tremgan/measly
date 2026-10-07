@@ -7,7 +7,7 @@
 
 More data is always better, but how much better?
 
-measly estimates whether a model is data-limited, meaning whether measuring more samples would improve its performance. It is built for fields where each measurement is slow and expensive, such as the life sciences.
+measly estimates the marginal utility of more data points on a models performance. It is built for fields where each measurement is slow and expensive, such as the life sciences.
 
 Note that measly's sweep trains `'n_draws' * 'n_models' * 'n_fractions'` models, which can be extremely computationally expensive. The premise is that this is (should be) still cheaper than collecting new data. If this is not the case, measly isn't appropriate for your use case.
 
