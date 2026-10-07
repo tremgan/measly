@@ -23,6 +23,12 @@ with $d$ fixed at zero:
 
 $$L(n) = L_\infty + A\,n^{-\alpha}$$
 
+Planned: a Laplace approximation as an alternative to the per-draw sampling
+above. The covariance at one fit's optimum gives a band without refitting every
+draw, which is far cheaper. It answers a different question, though: parameter
+uncertainty given one dataset, rather than the scatter across draws that the
+current band measures.
+
 ## Example
 
 <img width="991" height="662" alt="image" src="https://github.com/user-attachments/assets/2e0892b5-ade2-450f-a241-8a807b61e2e2" />
