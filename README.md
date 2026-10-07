@@ -11,6 +11,10 @@ measly estimates whether a model is data-limited, meaning whether measuring more
 
 Note that measly's sweep trains `'n_draws' * 'n_models' * 'n_fractions'` models, which can be extremely computationally expensive. The premise is that this is (should be) still cheaper than collecting new data. If this is not the case, measly isn't appropriate for your use case.
 
+An additional point is that whole subsampling procedure is conditioned on the full dataset, meaning the extrapolation is conditioned on the dataset you happened to sample (not the actual data distribution). I believe that this leads to the extrapolation being pessimistic (since never-before-seen samples would lead to a 'richer' dataset), but I need to run the actual experiment first to confirm this claim.
+
+Outstanding is also whether the uncertainties are properly calibrated.
+
 
 ## Problem Definition 
 
