@@ -2,7 +2,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/measly)](https://pypi.org/project/measly/)
 
-> [!WARNING]
 > **Work in progress.** This project is under active development. Not really ready for external use.
 
 More data is always better, but how much better?
