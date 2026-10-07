@@ -5,7 +5,7 @@
 > [!WARNING]
 > **Work in progress.** This project is under active development. Not really ready for external use.
 
-More data helps is always better, but how much better?
+More data is always better, but how much better?
 
 measly estimates whether a model is data-limited, meaning whether measuring more samples would improve its performance. It is built for fields where each measurement is slow and expensive, such as the life sciences.
 
